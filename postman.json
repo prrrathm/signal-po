@@ -1,0 +1,444 @@
+{
+  "info": {
+    "_postman_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "name": "Signal PO",
+    "description": "Purchase order confirmation triage system API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000",
+      "type": "string"
+    },
+    {
+      "key": "emailId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "confirmationId",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "description": "Custom stateful sessions. Login creates an HMAC-signed token + DB row in `sessions`. The cookie holds `<uuid>.<hmac>` — middleware verifies the signature in Edge without a DB query; server code also checks the DB row exists and is not expired. Logout deletes the DB row immediately.",
+      "item": [
+        {
+          "name": "Sign in",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"user@example.com\",\n  \"password\": \"password123\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "login"]
+            },
+            "description": "Verifies credentials, creates a row in the `sessions` table, and sets an HttpOnly `session_token` cookie. No CSRF token required."
+          }
+        },
+        {
+          "name": "Get session",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/session",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "session"]
+            },
+            "description": "Returns `{ user: { id, email, name } }` when authenticated, or `{}` when unauthenticated. Validates the cookie HMAC and the DB session row on every call."
+          }
+        },
+        {
+          "name": "Sign out",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": ""
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/logout",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "logout"]
+            },
+            "description": "Deletes the session row from the `sessions` table and clears the `session_token` cookie. Session is immediately invalid — no grace period."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Seed",
+      "item": [
+        {
+          "name": "Seed mock data",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": ""
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/seed",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "seed"]
+            },
+            "description": "Seeds 3 purchase orders and 5 supplier emails covering matched, quantity short, delayed, price deviation, and unmatched scenarios."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Purchase Orders",
+      "item": [
+        {
+          "name": "List purchase orders",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/purchase-orders",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "purchase-orders"]
+            }
+          }
+        },
+        {
+          "name": "Create purchase order",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"poNumber\": \"PO-2024-100\",\n  \"supplierName\": \"Acme Components Ltd\",\n  \"expectedQty\": 500,\n  \"expectedDeliveryDate\": \"2026-06-01\",\n  \"expectedUnitPrice\": \"12.50\",\n  \"currency\": \"USD\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/purchase-orders",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "purchase-orders"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Emails",
+      "item": [
+        {
+          "name": "List emails",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/emails",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "emails"]
+            }
+          }
+        },
+        {
+          "name": "Ingest email",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"subject\": \"RE: PO-2024-001 Confirmation\",\n  \"supplierName\": \"Acme Components Ltd\",\n  \"emailBody\": \"Dear Team,\\n\\nWe are pleased to confirm your purchase order PO-2024-001.\\n\\nOrder details:\\n- Quantity confirmed: 500 units\\n- Unit price: $12.50\\n- Estimated delivery: May 1, 2026\\n\\nThank you for your business.\\n\\nBest regards,\\nAcme Components Ltd\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/emails",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "emails"]
+            },
+            "description": "Stores the email and enqueues a processing job. Call POST /api/worker afterward to extract and compare."
+          }
+        },
+        {
+          "name": "Ingest email — quantity short",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"subject\": \"Order Confirmation - PO-2024-002\",\n  \"supplierName\": \"Global Parts Inc\",\n  \"emailBody\": \"Hello,\\n\\nThis is to confirm receipt and acceptance of your order PO-2024-002.\\n\\nWe can confirm 150 units (out of 200 requested) at $45.00 per unit.\\nThe remaining 50 units will ship in a second batch.\\n\\nDelivery date: May 10, 2026.\\n\\nRegards,\\nGlobal Parts Inc\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/emails",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "emails"]
+            }
+          }
+        },
+        {
+          "name": "Ingest email — delivery delay",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"subject\": \"PO-2024-003 - Delivery Delay Notice\",\n  \"supplierName\": \"FastShip Supplies\",\n  \"emailBody\": \"Dear Customer,\\n\\nWe regret to inform you that your order PO-2024-003 will be delayed.\\n\\nConfirmed details:\\n- Quantity: 1000 units\\n- Unit price: $3.75\\n- NEW delivery date: May 20, 2026 (originally April 28)\\n\\nWe apologize for any inconvenience.\\n\\nFastShip Supplies\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/emails",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "emails"]
+            }
+          }
+        },
+        {
+          "name": "Ingest email — price deviation",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"subject\": \"Price Update - PO-2024-001 Amendment\",\n  \"supplierName\": \"Acme Components Ltd\",\n  \"emailBody\": \"Hi,\\n\\nPlease note a price amendment for PO-2024-001.\\n\\nDue to increased raw material costs, the updated unit price is $14.00 (was $12.50).\\nQuantity remains 500 units, delivery May 1, 2026.\\n\\nPlease confirm acceptance.\\n\\nAcme Components\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/emails",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "emails"]
+            }
+          }
+        },
+        {
+          "name": "Ingest email — unmatched PO",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"subject\": \"Confirmation for your recent order\",\n  \"supplierName\": \"Unknown Supplier\",\n  \"emailBody\": \"Hello,\\n\\nThanks for your order! We have processed order number PO-9999-XYZ.\\n\\nQty: 300 pieces\\nPrice: $22.00 each\\nShip date: sometime next month\\n\\nLet us know if you have questions.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/emails",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "emails"]
+            }
+          }
+        },
+        {
+          "name": "Get email by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/emails/{{emailId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "emails", "{{emailId}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Worker",
+      "item": [
+        {
+          "name": "Process next job",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": ""
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/worker",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "worker"]
+            },
+            "description": "Picks the oldest pending job, calls Claude for extraction, compares against the PO, and saves the result. Call repeatedly to drain the queue."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Confirmations",
+      "item": [
+        {
+          "name": "List confirmations",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/confirmations",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "confirmations"]
+            }
+          }
+        },
+        {
+          "name": "Get confirmation by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/confirmations/{{confirmationId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "confirmations", "{{confirmationId}}"]
+            }
+          }
+        },
+        {
+          "name": "Approve confirmation",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"action\": \"approve\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/confirmations/{{confirmationId}}/action",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "confirmations", "{{confirmationId}}", "action"]
+            }
+          }
+        },
+        {
+          "name": "Snooze confirmation",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"action\": \"snooze\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/confirmations/{{confirmationId}}/action",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "confirmations", "{{confirmationId}}", "action"]
+            }
+          }
+        },
+        {
+          "name": "Resolve confirmation",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"action\": \"resolve\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/confirmations/{{confirmationId}}/action",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "confirmations", "{{confirmationId}}", "action"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
