@@ -19,8 +19,12 @@ export async function proxy(req: NextRequest) {
     return NextResponse.next()
   }
 
-  // Worker route is authenticated via WORKER_SECRET header inside the route handler
-  if (pathname === '/api/worker') {
+  // These routes authenticate via their own secrets inside the route handler
+  if (
+    pathname === '/api/worker' ||
+    pathname === '/api/cron/run' ||
+    pathname === '/api/emails/inbound'
+  ) {
     return NextResponse.next()
   }
 

@@ -1,0 +1,17 @@
+{
+  "regions": ["bom1"],
+  "functions": {
+    "src/app/api/worker/route.ts": {
+      "maxDuration": 120
+    },
+    "src/app/api/cron/run/route.ts": {
+      "maxDuration": 60
+    },
+    "src/app/api/emails/inbound/route.ts": {
+      "maxDuration": 60
+    },
+    "src/app/api/process-email/route.ts": {
+      "maxDuration": 120
+    }
+  }
+}
