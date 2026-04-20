@@ -1,14 +1,12 @@
-import { PDFParse } from 'pdf-parse'
+import pdfParse from 'pdf-parse'
 
 const SCANNED_TEXT_THRESHOLD = 200
 
 export async function extractPdf(buffer: Buffer): Promise<string> {
   let text = ''
   try {
-    const parser = new PDFParse({ data: new Uint8Array(buffer) })
-    const result = await parser.getText()
+    const result = await pdfParse(buffer)
     text = result.text?.trim() ?? ''
-    await parser.destroy()
   } catch {
     // pdf-parse failed — fall through to OCR
   }
