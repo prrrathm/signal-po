@@ -3,7 +3,8 @@ import type { ExtractionResult } from '../types'
 
 export async function extractEmailData(
   subject: string,
-  body: string
+  body: string,
+  attachmentTexts: string[] = []
 ): Promise<ExtractionResult> {
-  return extractFromEmail(subject, body)
+  return extractFromEmail(subject, body, attachmentTexts)
 }

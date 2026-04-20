@@ -2,9 +2,15 @@ import { drizzle } from 'drizzle-orm/postgres-js'
 import postgres from 'postgres'
 import * as schema from './schema'
 
-const connectionString = process.env.DATABASE_URL!
+function createDb() {
+  const client = postgres(process.env.DATABASE_URL!, { prepare: false })
+  return drizzle(client, { schema })
+}
 
-// Disable prefetch for serverless/edge environments
-const client = postgres(connectionString, { prepare: false })
+type Db = ReturnType<typeof createDb>
 
-export const db = drizzle(client, { schema })
+// Persist the connection across hot-module reloads in dev to avoid cold-start latency
+const g = globalThis as typeof globalThis & { _db?: Db }
+if (!g._db) g._db = createDb()
+
+export const db: Db = g._db

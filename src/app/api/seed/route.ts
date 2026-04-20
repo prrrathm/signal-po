@@ -1,6 +1,7 @@
 import { createPurchaseOrder } from '@/lib/services/po.service'
 import { storeEmail } from '@/lib/services/email.service'
 import { enqueue } from '@/lib/queue/queue'
+import { getSession } from '@/lib/auth/session'
 
 const MOCK_POS = [
   {
@@ -108,15 +109,21 @@ Let us know if you have questions.`,
 ]
 
 export async function POST() {
-  const createdPos = await Promise.all(MOCK_POS.map((po) => createPurchaseOrder(po)))
+  const session = await getSession()
+  if (!session?.activeTeamId) {
+    return Response.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  const teamId = session.activeTeamId
+
+  const createdPos = await Promise.all(MOCK_POS.map((po) => createPurchaseOrder(po, teamId)))
 
   const createdEmails = []
   for (const emailData of MOCK_EMAILS) {
-    const email = await storeEmail({
-      subject: emailData.subject,
-      body: emailData.emailBody,
-      supplierName: emailData.supplierName,
-    })
+    const email = await storeEmail(
+      { subject: emailData.subject, body: emailData.emailBody, supplierName: emailData.supplierName },
+      teamId
+    )
     await enqueue(email.id)
     createdEmails.push(email)
   }

@@ -1,11 +1,12 @@
 'use server'
 
 import { db } from '@/db'
-import { users } from '@/db/schema'
+import { users, teamMembers } from '@/db/schema'
 import { eq } from 'drizzle-orm'
 import bcrypt from 'bcryptjs'
 import { redirect } from 'next/navigation'
-import { createSession, destroySession } from '@/lib/auth/session'
+import { createSession, destroySession, setActiveTeam } from '@/lib/auth/session'
+import { createPersonalTeam } from '@/lib/services/team.service'
 
 export async function login(_prev: unknown, formData: FormData) {
   const email = formData.get('email') as string
@@ -27,6 +28,19 @@ export async function login(_prev: unknown, formData: FormData) {
   }
 
   await createSession(user.id)
+
+  // Set the active team to the user's first (personal) team
+  const [firstMembership] = await db
+    .select({ teamId: teamMembers.teamId })
+    .from(teamMembers)
+    .where(eq(teamMembers.userId, user.id))
+    .orderBy(teamMembers.createdAt)
+    .limit(1)
+
+  if (firstMembership) {
+    await setActiveTeam(firstMembership.teamId)
+  }
+
   redirect(callbackUrl)
 }
 
@@ -49,7 +63,12 @@ export async function register(_prev: unknown, formData: FormData) {
   }
 
   const passwordHash = await bcrypt.hash(password, 12)
-  await db.insert(users).values({ name: name || null, email, passwordHash })
+  const [newUser] = await db
+    .insert(users)
+    .values({ name: name || null, email, passwordHash })
+    .returning()
+
+  await createPersonalTeam(newUser.id, name || email.split('@')[0], email)
 
   redirect('/login?registered=1')
 }

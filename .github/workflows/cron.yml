@@ -1,0 +1,20 @@
+name: Cron — Process Email Queue
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'   # every 5 minutes, UTC
+  workflow_dispatch:          # allow manual trigger from GitHub Actions UI
+
+jobs:
+  run-cron:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3        # fail fast; the endpoint has maxDuration=60s
+    steps:
+      - name: Trigger cron endpoint
+        run: |
+          curl --fail --silent --show-error \
+            --max-time 90 \
+            -X POST \
+            -H "x-cron-secret: ${{ secrets.CRON_SECRET }}" \
+            -H "Content-Type: application/json" \
+            "${{ secrets.APP_URL }}/api/cron/run"

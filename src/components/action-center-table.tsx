@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import {
   useReactTable,
   getCoreRowModel,
@@ -18,6 +18,7 @@ import {
 } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { StatusBadge } from '@/components/status-badge'
 import { MismatchList } from '@/components/mismatch-badge'
 import type { ConfirmationWithDetails } from '@/lib/types'
@@ -91,11 +92,14 @@ export function ActionCenterTable() {
 
   useEffect(() => {
     fetchData()
-    const interval = setInterval(fetchData, 10_000)
+    const interval = setInterval(fetchData, 30_000)
     return () => clearInterval(interval)
   }, [fetchData])
 
-  const filtered = filter === 'all' ? data : data.filter((d) => d.status === filter)
+  const filtered = useMemo(
+    () => filter === 'all' ? data : data.filter((d) => d.status === filter),
+    [data, filter]
+  )
 
   const table = useReactTable({
     data: filtered,
@@ -128,24 +132,23 @@ export function ActionCenterTable() {
 
   return (
     <div className="space-y-4">
-      {/* Filter bar */}
-      <div className="flex items-center gap-2 flex-wrap">
-        {filters.map((f) => (
-          <Button
-            key={f.value}
-            variant={filter === f.value ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setFilter(f.value)}
-          >
-            {f.label}
-            {f.value !== 'all' && (
-              <Badge variant="secondary" className="ml-1 text-xs">
-                {data.filter((d) => d.status === f.value).length}
-              </Badge>
-            )}
-          </Button>
-        ))}
-        <Button variant="ghost" size="sm" onClick={fetchData} className="ml-auto">
+      {/* Filter tabs */}
+      <div className="flex items-center gap-2">
+        <Tabs value={filter} onValueChange={(v) => setFilter(v as FilterStatus)} className="flex-1">
+          <TabsList>
+            {filters.map((f) => (
+              <TabsTrigger key={f.value} value={f.value} className="gap-1.5">
+                {f.label}
+                {f.value !== 'all' && (
+                  <Badge variant="secondary" className="text-xs px-1.5 py-0 h-4">
+                    {data.filter((d) => d.status === f.value).length}
+                  </Badge>
+                )}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
+        <Button variant="ghost" size="sm" onClick={fetchData}>
           ↻ Refresh
         </Button>
       </div>
@@ -229,7 +232,7 @@ export function ActionCenterTable() {
           </TableBody>
         </Table>
       </div>
-      <p className="text-xs text-gray-400">Auto-refreshes every 10 seconds.</p>
+      <p className="text-xs text-gray-400">Auto-refreshes every 30 seconds.</p>
     </div>
   )
 }

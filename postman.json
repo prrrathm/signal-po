@@ -1,444 +1,532 @@
 {
-  "info": {
-    "_postman_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-    "name": "Signal PO",
-    "description": "Purchase order confirmation triage system API",
-    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
-  },
-  "variable": [
+  "_type": "export",
+  "__export_format": 4,
+  "__export_date": "2026-04-20T00:00:00.000Z",
+  "__export_source": "signal-po",
+  "resources": [
     {
-      "key": "baseUrl",
-      "value": "http://localhost:3000",
-      "type": "string"
+      "_id": "wrk_signal_po",
+      "_type": "workspace",
+      "name": "Signal PO",
+      "description": "Purchase order confirmation triage system.\n\nAuth: All routes (except the inbound webhook) use a session cookie. Sign in first — the client stores the cookie automatically for subsequent requests.\n\nInbound webhook: authenticated via `?token=<INBOUND_WEBHOOK_SECRET>` query param, no cookie needed.",
+      "scope": "collection"
     },
     {
-      "key": "emailId",
-      "value": "",
-      "type": "string"
+      "_id": "env_base",
+      "_type": "environment",
+      "parentId": "wrk_signal_po",
+      "name": "Base Environment",
+      "data": {
+        "baseUrl": "http://localhost:3000",
+        "teamId": "",
+        "userId": "",
+        "emailId": "",
+        "confirmationId": "",
+        "workerSecret": "",
+        "inboundWebhookSecret": ""
+      },
+      "dataPropertyOrder": {
+        "&": [
+          "baseUrl",
+          "teamId",
+          "userId",
+          "emailId",
+          "confirmationId",
+          "workerSecret",
+          "inboundWebhookSecret"
+        ]
+      }
     },
+
     {
-      "key": "confirmationId",
-      "value": "",
-      "type": "string"
-    }
-  ],
-  "item": [
-    {
+      "_id": "fld_auth",
+      "_type": "request_group",
+      "parentId": "wrk_signal_po",
       "name": "Auth",
-      "description": "Custom stateful sessions. Login creates an HMAC-signed token + DB row in `sessions`. The cookie holds `<uuid>.<hmac>` — middleware verifies the signature in Edge without a DB query; server code also checks the DB row exists and is not expired. Logout deletes the DB row immediately.",
-      "item": [
-        {
-          "name": "Sign in",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"email\": \"user@example.com\",\n  \"password\": \"password123\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            },
-            "url": {
-              "raw": "{{baseUrl}}/api/auth/login",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "auth", "login"]
-            },
-            "description": "Verifies credentials, creates a row in the `sessions` table, and sets an HttpOnly `session_token` cookie. No CSRF token required."
-          }
-        },
-        {
-          "name": "Get session",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/api/auth/session",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "auth", "session"]
-            },
-            "description": "Returns `{ user: { id, email, name } }` when authenticated, or `{}` when unauthenticated. Validates the cookie HMAC and the DB session row on every call."
-          }
-        },
-        {
-          "name": "Sign out",
-          "request": {
-            "method": "POST",
-            "header": [],
-            "body": {
-              "mode": "raw",
-              "raw": ""
-            },
-            "url": {
-              "raw": "{{baseUrl}}/api/auth/logout",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "auth", "logout"]
-            },
-            "description": "Deletes the session row from the `sessions` table and clears the `session_token` cookie. Session is immediately invalid — no grace period."
-          }
-        }
-      ]
+      "description": "Session-based authentication. Sign in returns an HttpOnly `session_token` cookie. The client stores it automatically — all subsequent requests in this collection will be authenticated.\n\nThe cookie contains `<session-uuid>.<hmac-signature>`. Middleware validates the HMAC in Edge (no DB hit). Server routes additionally confirm the session row exists in the DB and has not expired. Sign out deletes the DB row, invalidating the session immediately."
     },
     {
+      "_id": "req_auth_login",
+      "_type": "request",
+      "parentId": "fld_auth",
+      "name": "Sign in",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/auth/login",
+      "description": "Verifies credentials, writes a row to the `sessions` table, and sets an HttpOnly `session_token` cookie (SameSite=Lax, Secure in production).\n\nAlso sets `activeTeamId` in the session to the user's first team membership.\n\nReturns: `{ ok: true }`\nErrors: 401 on bad credentials.",
+      "headers": [
+        { "name": "Content-Type", "value": "application/json" }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"email\": \"user@example.com\",\n  \"password\": \"password123\"\n}"
+      }
+    },
+    {
+      "_id": "req_auth_session",
+      "_type": "request",
+      "parentId": "fld_auth",
+      "name": "Get current session",
+      "method": "GET",
+      "url": "{{baseUrl}}/api/auth/session",
+      "description": "Returns the current user and active team from the session cookie.\n\nReturns: `{ user: { id, email, name }, activeTeamId }` or `{}` if not authenticated.",
+      "headers": []
+    },
+    {
+      "_id": "req_auth_logout",
+      "_type": "request",
+      "parentId": "fld_auth",
+      "name": "Sign out",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/auth/logout",
+      "description": "Deletes the session row from the DB and clears the `session_token` cookie. The session is invalid immediately — no grace period.\n\nReturns: `{ ok: true }`",
+      "headers": []
+    },
+
+    {
+      "_id": "fld_seed",
+      "_type": "request_group",
+      "parentId": "wrk_signal_po",
       "name": "Seed",
-      "item": [
-        {
-          "name": "Seed mock data",
-          "request": {
-            "method": "POST",
-            "header": [],
-            "body": {
-              "mode": "raw",
-              "raw": ""
-            },
-            "url": {
-              "raw": "{{baseUrl}}/api/seed",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "seed"]
-            },
-            "description": "Seeds 3 purchase orders and 5 supplier emails covering matched, quantity short, delayed, price deviation, and unmatched scenarios."
-          }
-        }
-      ]
+      "description": "Dev-only helper. Creates 3 purchase orders and 5 supplier confirmation emails (matched, quantity short, delayed delivery, price deviation, unmatched PO) scoped to the active team."
     },
     {
+      "_id": "req_seed",
+      "_type": "request",
+      "parentId": "fld_seed",
+      "name": "Seed mock data",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/seed",
+      "description": "Creates 3 POs and 5 emails covering all confirmation statuses. Jobs are enqueued but not processed — call POST /api/process-email afterward to run extraction.\n\nReturns: `{ message, purchaseOrders: 3, emails: 5 }`",
+      "headers": []
+    },
+
+    {
+      "_id": "fld_purchase_orders",
+      "_type": "request_group",
+      "parentId": "wrk_signal_po",
       "name": "Purchase Orders",
-      "item": [
-        {
-          "name": "List purchase orders",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/api/purchase-orders",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "purchase-orders"]
-            }
-          }
-        },
-        {
-          "name": "Create purchase order",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"poNumber\": \"PO-2024-100\",\n  \"supplierName\": \"Acme Components Ltd\",\n  \"expectedQty\": 500,\n  \"expectedDeliveryDate\": \"2026-06-01\",\n  \"expectedUnitPrice\": \"12.50\",\n  \"currency\": \"USD\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            },
-            "url": {
-              "raw": "{{baseUrl}}/api/purchase-orders",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "purchase-orders"]
-            }
-          }
-        }
-      ]
+      "description": "POs are the source of truth for what was ordered. Confirmations from suppliers are matched against these."
     },
     {
+      "_id": "req_po_list",
+      "_type": "request",
+      "parentId": "fld_purchase_orders",
+      "name": "List purchase orders",
+      "method": "GET",
+      "url": "{{baseUrl}}/api/purchase-orders",
+      "description": "Returns all active POs for the session's active team, ordered by creation date.\n\nReturns: `PurchaseOrder[]`",
+      "headers": []
+    },
+    {
+      "_id": "req_po_create",
+      "_type": "request",
+      "parentId": "fld_purchase_orders",
+      "name": "Create purchase order",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/purchase-orders",
+      "description": "Creates a new PO scoped to the active team. `poNumber` must be unique per team.\n\n`currency` defaults to `USD` if omitted.\n\nReturns: `PurchaseOrder` (201)",
+      "headers": [
+        { "name": "Content-Type", "value": "application/json" }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"poNumber\": \"PO-2024-100\",\n  \"supplierName\": \"Acme Components Ltd\",\n  \"expectedQty\": 500,\n  \"expectedDeliveryDate\": \"2026-06-01\",\n  \"expectedUnitPrice\": \"12.50\",\n  \"currency\": \"USD\"\n}"
+      }
+    },
+
+    {
+      "_id": "fld_emails",
+      "_type": "request_group",
+      "parentId": "wrk_signal_po",
       "name": "Emails",
-      "item": [
-        {
-          "name": "List emails",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/api/emails",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "emails"]
-            }
-          }
-        },
-        {
-          "name": "Ingest email",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"subject\": \"RE: PO-2024-001 Confirmation\",\n  \"supplierName\": \"Acme Components Ltd\",\n  \"emailBody\": \"Dear Team,\\n\\nWe are pleased to confirm your purchase order PO-2024-001.\\n\\nOrder details:\\n- Quantity confirmed: 500 units\\n- Unit price: $12.50\\n- Estimated delivery: May 1, 2026\\n\\nThank you for your business.\\n\\nBest regards,\\nAcme Components Ltd\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            },
-            "url": {
-              "raw": "{{baseUrl}}/api/emails",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "emails"]
-            },
-            "description": "Stores the email and enqueues a processing job. Call POST /api/worker afterward to extract and compare."
-          }
-        },
-        {
-          "name": "Ingest email — quantity short",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"subject\": \"Order Confirmation - PO-2024-002\",\n  \"supplierName\": \"Global Parts Inc\",\n  \"emailBody\": \"Hello,\\n\\nThis is to confirm receipt and acceptance of your order PO-2024-002.\\n\\nWe can confirm 150 units (out of 200 requested) at $45.00 per unit.\\nThe remaining 50 units will ship in a second batch.\\n\\nDelivery date: May 10, 2026.\\n\\nRegards,\\nGlobal Parts Inc\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            },
-            "url": {
-              "raw": "{{baseUrl}}/api/emails",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "emails"]
-            }
-          }
-        },
-        {
-          "name": "Ingest email — delivery delay",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"subject\": \"PO-2024-003 - Delivery Delay Notice\",\n  \"supplierName\": \"FastShip Supplies\",\n  \"emailBody\": \"Dear Customer,\\n\\nWe regret to inform you that your order PO-2024-003 will be delayed.\\n\\nConfirmed details:\\n- Quantity: 1000 units\\n- Unit price: $3.75\\n- NEW delivery date: May 20, 2026 (originally April 28)\\n\\nWe apologize for any inconvenience.\\n\\nFastShip Supplies\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            },
-            "url": {
-              "raw": "{{baseUrl}}/api/emails",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "emails"]
-            }
-          }
-        },
-        {
-          "name": "Ingest email — price deviation",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"subject\": \"Price Update - PO-2024-001 Amendment\",\n  \"supplierName\": \"Acme Components Ltd\",\n  \"emailBody\": \"Hi,\\n\\nPlease note a price amendment for PO-2024-001.\\n\\nDue to increased raw material costs, the updated unit price is $14.00 (was $12.50).\\nQuantity remains 500 units, delivery May 1, 2026.\\n\\nPlease confirm acceptance.\\n\\nAcme Components\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            },
-            "url": {
-              "raw": "{{baseUrl}}/api/emails",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "emails"]
-            }
-          }
-        },
-        {
-          "name": "Ingest email — unmatched PO",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"subject\": \"Confirmation for your recent order\",\n  \"supplierName\": \"Unknown Supplier\",\n  \"emailBody\": \"Hello,\\n\\nThanks for your order! We have processed order number PO-9999-XYZ.\\n\\nQty: 300 pieces\\nPrice: $22.00 each\\nShip date: sometime next month\\n\\nLet us know if you have questions.\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            },
-            "url": {
-              "raw": "{{baseUrl}}/api/emails",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "emails"]
-            }
-          }
-        },
-        {
-          "name": "Get email by ID",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/api/emails/{{emailId}}",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "emails", "{{emailId}}"]
-            }
-          }
-        }
-      ]
+      "description": "Emails are supplier confirmations. Two ingestion paths exist:\n\n1. **Manual** — POST /api/emails (session auth, JSON or multipart)\n2. **Webhook** — POST /api/emails/inbound (token auth, SendGrid or Postmark format)\n\nBoth paths store the email, save any attachments to disk, and enqueue a processing job. The job is not run automatically — call POST /api/process-email or POST /api/worker to execute it."
     },
     {
+      "_id": "req_emails_list",
+      "_type": "request",
+      "parentId": "fld_emails",
+      "name": "List emails",
+      "method": "GET",
+      "url": "{{baseUrl}}/api/emails",
+      "description": "Returns all emails for the active team, newest first.\n\nReturns: `Email[]` — includes `status`, `hasAttachments`, `fromEmail`, `messageId`.",
+      "headers": []
+    },
+    {
+      "_id": "req_emails_get",
+      "_type": "request",
+      "parentId": "fld_emails",
+      "name": "Get email by ID",
+      "method": "GET",
+      "url": "{{baseUrl}}/api/emails/{{emailId}}",
+      "description": "Returns a single email row. 404 if not found or not owned by the active team.",
+      "headers": []
+    },
+    {
+      "_id": "req_emails_ingest_json",
+      "_type": "request",
+      "parentId": "fld_emails",
+      "name": "Ingest email — JSON body",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/emails",
+      "description": "Ingests an email without attachments. Use when pasting raw email text directly.\n\nRequired: `subject`, `emailBody`. Optional: `supplierName`, `messageId`, `fromEmail`.\n\nReturns: `{ email, jobId, attachmentCount: 0 }` (201)",
+      "headers": [
+        { "name": "Content-Type", "value": "application/json" }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"subject\": \"RE: PO-2024-001 Confirmation\",\n  \"supplierName\": \"Acme Components Ltd\",\n  \"emailBody\": \"Dear Team,\\n\\nWe are pleased to confirm your purchase order PO-2024-001.\\n\\nOrder details:\\n- Quantity confirmed: 500 units\\n- Unit price: $12.50\\n- Estimated delivery: May 1, 2026\\n\\nThank you for your business.\\n\\nBest regards,\\nAcme Components Ltd\"\n}"
+      }
+    },
+    {
+      "_id": "req_emails_ingest_multipart",
+      "_type": "request",
+      "parentId": "fld_emails",
+      "name": "Ingest email — multipart with attachment",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/emails",
+      "description": "Ingests an email with file attachments. Use `multipart/form-data` — do not set Content-Type manually; the client sets the boundary automatically.\n\nSupported formats: PDF (text + OCR fallback), Excel (.xlsx, .xls), CSV, plain text, JPEG, PNG, WebP. Max 10 MB per file, up to 5 files.\n\nAttachments are stored to disk (UPLOAD_DIR) and processed by the worker when the job runs.\n\nReturns: `{ email, jobId, attachmentCount }` (201)",
+      "headers": [],
+      "body": {
+        "mimeType": "multipart/form-data",
+        "params": [
+          { "name": "subject", "value": "RE: PO-2024-001 Confirmation" },
+          { "name": "supplierName", "value": "Acme Components Ltd" },
+          { "name": "emailBody", "value": "Dear Team,\n\nPlease find the confirmation attached.\n\nBest regards,\nAcme Components Ltd" },
+          {
+            "name": "attachments",
+            "value": "",
+            "fileName": "",
+            "type": "file",
+            "description": "Select a PDF, Excel (.xlsx/.xls), CSV, or image file (max 10 MB, up to 5 files)"
+          }
+        ]
+      }
+    },
+    {
+      "_id": "req_emails_qty_short",
+      "_type": "request",
+      "parentId": "fld_emails",
+      "name": "Ingest email — quantity short",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/emails",
+      "description": "Scenario: supplier confirms fewer units than ordered. Produces a `needs_review` or `high_priority_flag` confirmation with a quantity mismatch.",
+      "headers": [
+        { "name": "Content-Type", "value": "application/json" }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"subject\": \"Order Confirmation - PO-2024-002\",\n  \"supplierName\": \"Global Parts Inc\",\n  \"emailBody\": \"Hello,\\n\\nThis is to confirm receipt and acceptance of your order PO-2024-002.\\n\\nWe can confirm 150 units (out of 200 requested) at $45.00 per unit.\\nThe remaining 50 units will ship in a second batch.\\n\\nDelivery date: May 10, 2026.\\n\\nRegards,\\nGlobal Parts Inc\"\n}"
+      }
+    },
+    {
+      "_id": "req_emails_delay",
+      "_type": "request",
+      "parentId": "fld_emails",
+      "name": "Ingest email — delivery delay",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/emails",
+      "description": "Scenario: delivery date pushed past the expected date. Produces a date mismatch.",
+      "headers": [
+        { "name": "Content-Type", "value": "application/json" }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"subject\": \"PO-2024-003 - Delivery Delay Notice\",\n  \"supplierName\": \"FastShip Supplies\",\n  \"emailBody\": \"Dear Customer,\\n\\nWe regret to inform you that your order PO-2024-003 will be delayed.\\n\\nConfirmed details:\\n- Quantity: 1000 units\\n- Unit price: $3.75\\n- NEW delivery date: May 20, 2026 (originally April 28)\\n\\nWe apologize for any inconvenience.\\n\\nFastShip Supplies\"\n}"
+      }
+    },
+    {
+      "_id": "req_emails_price",
+      "_type": "request",
+      "parentId": "fld_emails",
+      "name": "Ingest email — price deviation",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/emails",
+      "description": "Scenario: supplier raises unit price. Produces a price mismatch.",
+      "headers": [
+        { "name": "Content-Type", "value": "application/json" }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"subject\": \"Price Update - PO-2024-001 Amendment\",\n  \"supplierName\": \"Acme Components Ltd\",\n  \"emailBody\": \"Hi,\\n\\nPlease note a price amendment for PO-2024-001.\\n\\nDue to increased raw material costs, the updated unit price is $14.00 (was $12.50).\\nQuantity remains 500 units, delivery May 1, 2026.\\n\\nPlease confirm acceptance.\\n\\nAcme Components\"\n}"
+      }
+    },
+    {
+      "_id": "req_emails_unmatched",
+      "_type": "request",
+      "parentId": "fld_emails",
+      "name": "Ingest email — unmatched PO",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/emails",
+      "description": "Scenario: PO number extracted from the email does not match any PO in the database. Produces an `unmatched` confirmation.",
+      "headers": [
+        { "name": "Content-Type", "value": "application/json" }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"subject\": \"Confirmation for your recent order\",\n  \"supplierName\": \"Unknown Supplier\",\n  \"emailBody\": \"Hello,\\n\\nThanks for your order! We have processed order number PO-9999-XYZ.\\n\\nQty: 300 pieces\\nPrice: $22.00 each\\nShip date: sometime next month\\n\\nLet us know if you have questions.\"\n}"
+      }
+    },
+    {
+      "_id": "req_emails_inbound_postmark",
+      "_type": "request",
+      "parentId": "fld_emails",
+      "name": "Inbound webhook — Postmark",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/emails/inbound?teamId={{teamId}}&token={{inboundWebhookSecret}}",
+      "description": "Postmark inbound webhook format. No session cookie required — authenticated via `?token=<INBOUND_WEBHOOK_SECRET>`.\n\nSet your Postmark inbound stream URL to:\n  https://yourdomain.com/api/emails/inbound?teamId=<team-uuid>&token=<secret>\n\nBehaviour:\n- Deduplicates by `MessageID` — returns `{ duplicate: true }` (200) if already seen.\n- Strips quoted reply threads from `TextBody` before storing.\n- Decodes base64 `Attachments[].Content`, validates MIME type, saves to UPLOAD_DIR.\n- Enqueues a processing job automatically.\n\nReturns: `{ emailId, jobId, attachmentCount }` (201) or `{ duplicate: true }` (200)",
+      "headers": [
+        { "name": "Content-Type", "value": "application/json" }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"From\": \"supplier@acme.com\",\n  \"Subject\": \"RE: PO-2024-001 Confirmation\",\n  \"MessageID\": \"<unique-message-id@mail.acme.com>\",\n  \"TextBody\": \"Dear Team,\\n\\nWe confirm PO-2024-001.\\nQuantity: 500 units\\nUnit price: $12.50\\nDelivery: 2026-05-01\\n\\nBest regards,\\nAcme\",\n  \"HtmlBody\": \"\",\n  \"Attachments\": []\n}"
+      }
+    },
+    {
+      "_id": "req_emails_inbound_sendgrid",
+      "_type": "request",
+      "parentId": "fld_emails",
+      "name": "Inbound webhook — SendGrid",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/emails/inbound?teamId={{teamId}}&token={{inboundWebhookSecret}}",
+      "description": "SendGrid Inbound Parse format (multipart/form-data). No session cookie required.\n\nConfigure SendGrid Inbound Parse to POST to:\n  https://yourdomain.com/api/emails/inbound?teamId=<team-uuid>&token=<secret>\n\nSendGrid fields used:\n- `from` — sender address stored as `fromEmail`\n- `subject` — email subject\n- `text` — plain text body (preferred over `html`)\n- `headers` — raw headers string, parsed for `Message-ID`\n- `attachment-info` — JSON map of attachment metadata keyed by slot name\n- `attachment1` .. `attachment5` — file fields (up to 5, max 10 MB each)\n\nSame deduplication, thread stripping, and job enqueue behaviour as the Postmark endpoint.",
+      "headers": [],
+      "body": {
+        "mimeType": "multipart/form-data",
+        "params": [
+          { "name": "from", "value": "supplier@acme.com" },
+          { "name": "subject", "value": "RE: PO-2024-001 Confirmation" },
+          { "name": "text", "value": "Dear Team,\n\nWe confirm PO-2024-001.\nQuantity: 500 units\nUnit price: $12.50\nDelivery: 2026-05-01\n\nBest regards,\nAcme" },
+          { "name": "headers", "value": "Message-ID: <unique-msg-id@mail.acme.com>\nContent-Type: text/plain" },
+          { "name": "attachment-info", "value": "{}" }
+        ]
+      }
+    },
+
+    {
+      "_id": "fld_worker",
+      "_type": "request_group",
+      "parentId": "wrk_signal_po",
       "name": "Worker",
-      "item": [
-        {
-          "name": "Process next job",
-          "request": {
-            "method": "POST",
-            "header": [],
-            "body": {
-              "mode": "raw",
-              "raw": ""
-            },
-            "url": {
-              "raw": "{{baseUrl}}/api/worker",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "worker"]
-            },
-            "description": "Picks the oldest pending job, calls Claude for extraction, compares against the PO, and saves the result. Call repeatedly to drain the queue."
-          }
-        }
-      ]
+      "description": "Processing runs on demand — there is no background daemon. Call one of these endpoints after ingesting emails to run extraction and PO matching."
     },
     {
+      "_id": "req_worker_bearer",
+      "_type": "request",
+      "parentId": "fld_worker",
+      "name": "Process next job — Bearer auth",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/worker",
+      "description": "Picks the oldest `pending` job for `teamId`, claims it, and runs the full pipeline:\n1. Downloads any pending attachments from disk and extracts text (PDF → text or OCR, Excel → tabular text, CSV, image → OCR).\n2. Sends email body + attachment texts to the LLM for structured extraction.\n3. Matches the extracted PO number against the team's purchase orders.\n4. Compares confirmed qty / date / price against the PO and flags mismatches.\n5. Saves a `parsed_confirmations` row and any `mismatches`.\n6. Writes an audit log entry.\n\nRequires `Authorization: Bearer <WORKER_SECRET>` and `teamId` in the JSON body.\n\nCall repeatedly to drain the queue. Returns `{ processed: false }` when the queue is empty.\n\nReturns: `{ processed, jobId, confirmationId }` or `{ processed, jobId, error }`",
+      "headers": [
+        { "name": "Content-Type", "value": "application/json" }
+      ],
+      "authentication": {
+        "type": "bearer",
+        "token": "{{workerSecret}}"
+      },
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"teamId\": \"{{teamId}}\"\n}"
+      }
+    },
+    {
+      "_id": "req_worker_session",
+      "_type": "request",
+      "parentId": "fld_worker",
+      "name": "Process next job — session auth",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/process-email",
+      "description": "Same pipeline as POST /api/worker but uses the session cookie's `activeTeamId` instead of a Bearer token + body. Convenient for browser testing or calling from the UI.\n\nReturns: `{ processed, jobId, confirmationId }` or `{ processed, jobId, error }`",
+      "headers": []
+    },
+
+    {
+      "_id": "fld_teams",
+      "_type": "request_group",
+      "parentId": "wrk_signal_po",
+      "name": "Teams",
+      "description": "Multi-tenant. Every resource (POs, emails, confirmations) is scoped to a team. A user can belong to multiple teams with a role of `owner`, `admin`, or `member`. The active team is stored in the session and can be switched without signing out."
+    },
+    {
+      "_id": "req_teams_list",
+      "_type": "request",
+      "parentId": "fld_teams",
+      "name": "List my teams",
+      "method": "GET",
+      "url": "{{baseUrl}}/api/teams",
+      "description": "Returns all teams the authenticated user belongs to, including their role in each.\n\nReturns: `Array<{ id, name, slug, role, createdAt }>`",
+      "headers": []
+    },
+    {
+      "_id": "req_teams_switch",
+      "_type": "request",
+      "parentId": "fld_teams",
+      "name": "Switch active team",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/teams/switch",
+      "description": "Updates `activeTeamId` in the session cookie. User must be a member of the target team — returns 403 otherwise.\n\nReturns: `{ ok: true }`",
+      "headers": [
+        { "name": "Content-Type", "value": "application/json" }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"teamId\": \"{{teamId}}\"\n}"
+      }
+    },
+    {
+      "_id": "req_teams_update",
+      "_type": "request",
+      "parentId": "fld_teams",
+      "name": "Update team name",
+      "method": "PATCH",
+      "url": "{{baseUrl}}/api/teams/{{teamId}}",
+      "description": "Renames the team. Only the team `owner` can do this — returns 403 for any other role.\n\nReturns: updated `Team` object.",
+      "headers": [
+        { "name": "Content-Type", "value": "application/json" }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"name\": \"New Team Name\"\n}"
+      }
+    },
+    {
+      "_id": "req_teams_delete",
+      "_type": "request",
+      "parentId": "fld_teams",
+      "name": "Delete team",
+      "method": "DELETE",
+      "url": "{{baseUrl}}/api/teams/{{teamId}}",
+      "description": "Deletes the team and cascades to all its POs, emails, confirmations, and member records. Only the team `owner` can do this.\n\nReturns: `{ ok: true }`",
+      "headers": []
+    },
+    {
+      "_id": "req_teams_members_list",
+      "_type": "request",
+      "parentId": "fld_teams",
+      "name": "List team members",
+      "method": "GET",
+      "url": "{{baseUrl}}/api/teams/{{teamId}}/members",
+      "description": "Returns all members of the team. The caller must be a member of the team.\n\nReturns: `Array<{ id, userId, teamId, role, createdAt, user: { name, email } }>`",
+      "headers": []
+    },
+    {
+      "_id": "req_teams_members_invite",
+      "_type": "request",
+      "parentId": "fld_teams",
+      "name": "Invite member",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/teams/{{teamId}}/members",
+      "description": "Adds an existing user (by email) to the team. `role` can be `owner`, `admin`, or `member` — defaults to `member`. Only the team `owner` can invite.\n\nThe user must already have a registered account. Returns 400 if the email is not found or the user is already a member.\n\nReturns: `TeamMember` (201)",
+      "headers": [
+        { "name": "Content-Type", "value": "application/json" }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"email\": \"newmember@example.com\",\n  \"role\": \"member\"\n}"
+      }
+    },
+    {
+      "_id": "req_teams_members_role",
+      "_type": "request",
+      "parentId": "fld_teams",
+      "name": "Change member role",
+      "method": "PATCH",
+      "url": "{{baseUrl}}/api/teams/{{teamId}}/members/{{userId}}",
+      "description": "Changes a member's role. Valid values: `owner`, `admin`, `member`. Only the team `owner` can do this.\n\nReturns: `{ ok: true }`",
+      "headers": [
+        { "name": "Content-Type", "value": "application/json" }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"role\": \"admin\"\n}"
+      }
+    },
+    {
+      "_id": "req_teams_members_remove",
+      "_type": "request",
+      "parentId": "fld_teams",
+      "name": "Remove member",
+      "method": "DELETE",
+      "url": "{{baseUrl}}/api/teams/{{teamId}}/members/{{userId}}",
+      "description": "Removes a member from the team. Only the team `owner` can do this.\n\nReturns: `{ ok: true }`",
+      "headers": []
+    },
+
+    {
+      "_id": "fld_confirmations",
+      "_type": "request_group",
+      "parentId": "wrk_signal_po",
       "name": "Confirmations",
-      "item": [
-        {
-          "name": "List confirmations",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/api/confirmations",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "confirmations"]
-            }
-          }
-        },
-        {
-          "name": "Get confirmation by ID",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/api/confirmations/{{confirmationId}}",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "confirmations", "{{confirmationId}}"]
-            }
-          }
-        },
-        {
-          "name": "Approve confirmation",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"action\": \"approve\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            },
-            "url": {
-              "raw": "{{baseUrl}}/api/confirmations/{{confirmationId}}/action",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "confirmations", "{{confirmationId}}", "action"]
-            }
-          }
-        },
-        {
-          "name": "Snooze confirmation",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"action\": \"snooze\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            },
-            "url": {
-              "raw": "{{baseUrl}}/api/confirmations/{{confirmationId}}/action",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "confirmations", "{{confirmationId}}", "action"]
-            }
-          }
-        },
-        {
-          "name": "Resolve confirmation",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"action\": \"resolve\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            },
-            "url": {
-              "raw": "{{baseUrl}}/api/confirmations/{{confirmationId}}/action",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "confirmations", "{{confirmationId}}", "action"]
-            }
-          }
-        }
-      ]
+      "description": "Parsed confirmations are created automatically by the worker after an email is processed. Each confirmation links an email to a PO (or flags it as unmatched) and records any mismatches in qty, date, or price."
+    },
+    {
+      "_id": "req_confirmations_list",
+      "_type": "request",
+      "parentId": "fld_confirmations",
+      "name": "List confirmations",
+      "method": "GET",
+      "url": "{{baseUrl}}/api/confirmations",
+      "description": "Returns all confirmations for the active team, newest first. Cached with a 30-second TTL; invalidated on any action.\n\nEach item includes: `status` (`matched` | `needs_review` | `high_priority_flag` | `unmatched`), `confidence`, `mismatches[]`, and the linked email subject and PO number.\n\nReturns: `ConfirmationWithDetails[]`",
+      "headers": []
+    },
+    {
+      "_id": "req_confirmations_get",
+      "_type": "request",
+      "parentId": "fld_confirmations",
+      "name": "Get confirmation by ID",
+      "method": "GET",
+      "url": "{{baseUrl}}/api/confirmations/{{confirmationId}}",
+      "description": "Returns a single confirmation with full mismatch details. 404 if not found or not owned by the active team.",
+      "headers": []
+    },
+    {
+      "_id": "req_confirmations_approve",
+      "_type": "request",
+      "parentId": "fld_confirmations",
+      "name": "Approve confirmation",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/confirmations/{{confirmationId}}/action",
+      "description": "Marks the confirmation as approved. Sets `resolvedAt` and updates status to `matched`.\n\nReturns: `{ ok: true }`",
+      "headers": [
+        { "name": "Content-Type", "value": "application/json" }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"action\": \"approve\"\n}"
+      }
+    },
+    {
+      "_id": "req_confirmations_snooze",
+      "_type": "request",
+      "parentId": "fld_confirmations",
+      "name": "Snooze confirmation",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/confirmations/{{confirmationId}}/action",
+      "description": "Snoozes the confirmation. Sets `snoozedUntil` to 48 hours from now — it will reappear in the action center after that.\n\nReturns: `{ ok: true }`",
+      "headers": [
+        { "name": "Content-Type", "value": "application/json" }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"action\": \"snooze\"\n}"
+      }
+    },
+    {
+      "_id": "req_confirmations_resolve",
+      "_type": "request",
+      "parentId": "fld_confirmations",
+      "name": "Resolve confirmation",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/confirmations/{{confirmationId}}/action",
+      "description": "Resolves the confirmation, acknowledging any mismatches and closing the item. Sets `resolvedAt`.\n\nReturns: `{ ok: true }`",
+      "headers": [
+        { "name": "Content-Type", "value": "application/json" }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"action\": \"resolve\"\n}"
+      }
     }
   ]
 }

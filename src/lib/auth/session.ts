@@ -9,8 +9,11 @@ import { signToken, verifyToken, SESSION_COOKIE } from './token'
 
 const SESSION_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000 // 30 days
 
+export const ACTIVE_TEAM_COOKIE = 'active_team'
+
 export type Session = {
   user: { id: string; email: string; name: string | null }
+  activeTeamId: string | null
 }
 
 /** Creates a DB session record and sets the HttpOnly session cookie. */
@@ -29,6 +32,24 @@ export async function createSession(userId: string): Promise<void> {
     expires,
     path: '/',
   })
+}
+
+/** Sets the active_team cookie (plain UUID, not signed — auth enforced server-side). */
+export async function setActiveTeam(teamId: string): Promise<void> {
+  const jar = await cookies()
+  jar.set(ACTIVE_TEAM_COOKIE, teamId, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    maxAge: 30 * 24 * 60 * 60,
+    path: '/',
+  })
+}
+
+/** Reads the active_team cookie value. */
+export async function getActiveTeamId(): Promise<string | null> {
+  const jar = await cookies()
+  return jar.get(ACTIVE_TEAM_COOKIE)?.value ?? null
 }
 
 /**
@@ -61,7 +82,9 @@ export async function getSession(): Promise<Session | null> {
     return null
   }
 
-  return { user: { id: row.id, email: row.email, name: row.name } }
+  const activeTeamId = jar.get(ACTIVE_TEAM_COOKIE)?.value ?? null
+
+  return { user: { id: row.id, email: row.email, name: row.name }, activeTeamId }
 }
 
 /** Deletes the DB session record and clears the session cookie. */
@@ -77,4 +100,5 @@ export async function destroySession(): Promise<void> {
   }
 
   jar.delete(SESSION_COOKIE)
+  jar.delete(ACTIVE_TEAM_COOKIE)
 }

@@ -1,12 +1,25 @@
 import Link from 'next/link'
+import { redirect } from 'next/navigation'
 import { Separator } from '@/components/ui/separator'
 import { Button } from '@/components/ui/button'
-import { auth } from '@/auth'
+import { getSession } from '@/lib/auth/session'
+import { getTeamsForUser } from '@/lib/services/team.service'
 import { logout } from '@/app/actions/auth'
+import { TeamSwitcher } from '@/components/team-switcher'
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const session = await auth()
-  const user = session?.user
+  const session = await getSession()
+  if (!session) {
+    redirect('/login')
+  }
+
+  const user = session.user
+  const teams = await getTeamsForUser(user.id)
+
+  // If user somehow has no team, redirect to a safe page
+  if (teams.length === 0) {
+    redirect('/login')
+  }
 
   return (
     <div className="flex min-h-screen">
@@ -17,6 +30,13 @@ export default async function DashboardLayout({ children }: { children: React.Re
           <p className="text-xs text-gray-500 mt-0.5">PO Triage System</p>
         </div>
         <Separator />
+
+        {/* Team switcher */}
+        <div className="pt-2">
+          <TeamSwitcher teams={teams} activeTeamId={session.activeTeamId} />
+        </div>
+        <Separator />
+
         <nav className="flex-1 px-3 py-4 space-y-1">
           <Link
             href="/dashboard"
@@ -29,6 +49,12 @@ export default async function DashboardLayout({ children }: { children: React.Re
             className="flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-200 transition-colors"
           >
             <span>📨</span> Ingest Email
+          </Link>
+          <Link
+            href="/dashboard/settings/team"
+            className="flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-200 transition-colors"
+          >
+            <span>⚙️</span> Team Settings
           </Link>
         </nav>
         <Separator />

@@ -140,9 +140,7 @@ export default function EmailsPage() {
               <p className="text-xs text-gray-400">
                 Adds 3 purchase orders and 5 supplier emails with various scenarios
                 (matched, quantity short, delayed, price deviation, unmatched PO).
-                After seeding, call{' '}
-                <code className="bg-white border rounded px-1">POST /api/worker</code>{' '}
-                to process each email.
+                After seeding, use the Ingest Email form to trigger processing.
               </p>
             </CardContent>
           </Card>

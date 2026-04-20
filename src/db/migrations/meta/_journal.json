@@ -15,6 +15,55 @@
       "when": 1776516538172,
       "tag": "0001_wonderful_nehzno",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1776664199491,
+      "tag": "0002_curvy_giant_man",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1776667802963,
+      "tag": "0003_jittery_random",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1745136000000,
+      "tag": "0004_inbound_email_fields",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1745222400000,
+      "tag": "0005_email_integrations",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1776671763693,
+      "tag": "0006_broken_silhouette",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1745308800000,
+      "tag": "0007_job_retry_fields",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1776674833235,
+      "tag": "0008_furry_cannonball",
+      "breakpoints": true
     }
   ]
 }
